@@ -7,12 +7,43 @@ namespace bluffstopCFR {
         
         public int rank;
         public int suit;
-        public Card (string suit, int rank) {
+        public Card (string suit, string rank) {
             this.suit = suit;
-            this.rank = rank;
+            if (rank == "a") {
+                this.rank = 14;
+            } else if (rank == "k") {
+                this.rank = 13;
+            } else if (rank == "q") {
+                this.rank = 12;
+            } else if (rank == "j") {
+                this.rank = 11;
+            } else if (rank == "t") {
+                this.rank = 10;
+            } else {
+                this.rank = int.Parse(rank);
+            }
         }
+
         public override string ToString () {
             return suit + rank;
+        }
+
+        public override bool Equals (object obj) {
+            if (obj == null) {
+                return false;
+            }
+            Card card = obj as Card;
+            if (card == null) {
+                return false;
+            }
+            return this.rank == card.rank && this.suit == card.suit;
+        }
+
+        public bool greaterThan (Card card) {
+            if (this.suit != card.suit) {
+                return false;
+            }
+            return this.rank > card.rank;
         }
     }
     public class BluffStop{
@@ -44,7 +75,7 @@ namespace bluffstopCFR {
         public int initialDeckSize; // The initial size of the deck
         public List<Card> deck = new List<Card>(); // The deck of cards
         
-        public List<Dictionary<string, List<int>>> playerBluffableCards = new  List<Dictionary<string, List<int>>>();
+        public List<Dictionary<string, List<Card>>> playerBluffableCards = new  List<Dictionary<string, List<Card>>>();
         public int currentPlayer; // The current player
 
         public BluffStop() {
@@ -65,10 +96,10 @@ namespace bluffstopCFR {
             this.initialDeckSize = bluffStop.initialDeckSize;
             this.refreeActionHistory = new List<string>(bluffStop.refreeActionHistory);
             this.playerActionHistory = new List<List<string>>(bluffStop.playerActionHistory);
-            this.playerHands = new List<List<string>>(bluffStop.playerHands);
-            this.cardHistory = new List<string>(bluffStop.cardHistory);
-            this.deck = new List<string>(bluffStop.deck);
-            this.bluffCards = new List<List<string>>(bluffStop.bluffCards);
+            this.playerHands = new List<List<Card>>(bluffStop.playerHands);
+            this.cardHistory = new List<Card>(bluffStop.cardHistory);
+            this.deck = new List<Card>(bluffStop.deck);
+            this.playerBluffableCards = new List<Dictionary<string, List<Card>>>(bluffStop.playerBluffableCards);
         }
 
         public void setupDeck(){
@@ -77,10 +108,13 @@ namespace bluffstopCFR {
             string[] numbers = {"2", "3", "4", "5", "6", "7", "8", "9", "t", "j", "q", "k", "a"};
             foreach(string suit in suits){
                 foreach(string number in numbers){
-                    deck.Add(suit + number);
-                    // update bluff cards
-                    bluffCards[0].Add(suit + number);
-                    bluffCards[1].Add(suit + number);
+                    deck.Add(new Card(suit, number));
+                    for (int i = 0; i < 2; i++) {
+                        if (!playerBluffableCards[i].ContainsKey(suit)) {
+                            playerBluffableCards[i][suit] = new List<Card>();
+                        }
+                        playerBluffableCards[i][suit].Add(new Card(suit, number));
+                    }
                 }
             }
         }
@@ -91,7 +125,7 @@ namespace bluffstopCFR {
             int deckSize = deck.Count;
             for (int i = 0; i < deckSize; i++){
                 int j = rnd.Next(i, deckSize);
-                string temp = deck[i];
+                Card temp = deck[i];
                 deck[i] = deck[j];
                 deck[j] = temp;
             }
@@ -123,17 +157,12 @@ namespace bluffstopCFR {
             }
         }
 
-        public void revealCard(string card){
+        public void revealCard(Card card){
             // Reveal the card on the table
             cardHistory.Add(card);
             // Update the bluff cards
             for (int i = 0; i < 2; i++){
-                for (int j = 0; j < bluffCards[i].Count; j++){
-                    if (bluffCards[i][j] == card){
-                        bluffCards[i].RemoveAt(j);
-                        break; // ? Is it one loop or both (should be one)
-                    }
-                }
+                playerBluffableCards[i][card.suit].Remove(card); // ? Test if works properly
             }
         }
 
@@ -180,35 +209,45 @@ namespace bluffstopCFR {
             }
         }
 
-        public int getNumActions(string oppClaim, int player = -1){
-            // return number of actions
+        public int validMoves(Card oppClaimedCard, int player = -1){
+            // return the valid moves for player
             if (player == -1){
                 player = currentPlayer;
-            } 
-            int num_cards = playerHands[player].Count;
-            // how many cards are not seen yet and greater than the current card (same suit)
-            string oppSuit = oppClaim[0];
-            int opponentValue = int.Parse(oppClaim[1]);
-            int num_actions = 0;
-            for (int i = 0; i < num_cards; i++){
-                string card = playerHands[player][i];
-                if (card[0] == oppSuit && int.Parse(card[1]) > opponentValue){
-                    num_actions++;
+            }
+            Dictionary<string, var> validMoves = new Dictionary<string, var>();
+            // Honest moves
+            validMoves["H"] = new List<Card>();
+            for (int i = 0; i < playerHands[player].Count; i++){
+                if (playerHands[player][i].greaterThan(oppClaimedCard)){
+                    validMoves["H"].Add(playerHands[player][i]);
                 }
             }
-            int bluffActionSize = initialDeckSize - cardHistory.Count - num_cards;
-            return bluffActionSize * num_cards + num_cards + 2;
+            // Bluff moves
+            validMoves["B"] = new Dictionary<Card, List<Card>>();
+            for (int i = 0; i < playerBluffableCards[player][oppClaimedCard.suit].Count; i++){
+                validMoves["B"][playerBluffableCards[player][oppClaimedCard.suit][i]] = new List<Card>();
+                if (playerBluffableCards[player][oppClaimedCard.suit][i].greaterThan(oppClaimedCard)){
+                    for (int j = 0; j < playerHands[player].Count; j++){
+                        validMoves["B"][playerBluffableCards[player][oppClaimedCard.suit][i]].Add(playerHands[player][j]);
+                    }
+                }
+            }
+            // Pass moves - only one move
+            validMoves["P"] = new List<Card>();
+            validMoves["P"].Add(null);
+            // Call bluff moves
+            validMoves["C"] = new List<Card>();
+            validMoves["C"].Add(null);
+            // Return the valid moves
+            return validMoves;
         }
 
         public void applyAction(int action, int player = -1){
+            // Todo: Take into considiration; the start of the game, the end of the game
             // apply action to current player
-            // honest actions; bluff actions; fold/pass; call bluff
+            // honest actions; bluff actions; pass; call bluff
             // always in order
-            // check if valid action
-            int num_acts = getNumActions(player);
-            if (action < 0 || action >= num_acts){
-                throw new System.Exception("Invalid action");
-            }
+            // Todo: check if valid action
             if (player == -1){
                 player = currentPlayer;
             }
@@ -225,7 +264,7 @@ namespace bluffstopCFR {
                 enc = "P";
             } else {
                 // bluff action
-                int bluff_action = action - playerHands[player].Count;
+                int bluff_action_index = action - playerHands[player].Count;
                 string bluffCard = getBluffCard(player, bluff_action);
                 string realCard = getRealCard(player, bluff_action);
                 enc = "B" + bluffCard + "R" + realCard;
