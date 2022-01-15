@@ -4,7 +4,8 @@ namespace bluffstopCFR
 {
     public class CFRPlayer : Player {
         Random rnd = new Random();
-        int numRandomMoves = 0;
+        public int numRandomMoves = 0;
+        public int numMoves = 0;
         public CFRPlayer(Dictionary<string, Node> strategy) : base(strategy) { 
             this.strategy = strategy;
         }
@@ -12,6 +13,7 @@ namespace bluffstopCFR
             // get the action
             string infoState = game.getInfoState();
             // infostate is not in the keys act randomly
+            numMoves++;
             if (!strategy.ContainsKey(infoState)) {
                 numRandomMoves++;
                 return rnd.Next(moves.Count);

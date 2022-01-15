@@ -68,19 +68,27 @@ namespace bluffstopCFR
     {
         public static Random random = new Random();
         public static Dictionary<string, Node> nodeMap = new Dictionary<string, Node>();
-        // Train Khun poker
-        public CFRTrainer(){}
+        public int eval_freq = 100;
+        public CFRTrainer(int eval_freq=100){
+            this.eval_freq = eval_freq;
+        }
         public void train(int iterations)
         {
             double util = 0;
-            Console.WriteLine("Number of states: " + nodeMap.Count);
             using (var progress = new ProgressBar()) {
                 for (int i = 0; i < iterations; i++)
                 {
                     progress.Report((double) i / iterations);
-                    // Todo: Change the game into generic game
                     BluffStop game = new BluffStop();
                     util += cfr(game, 1, 1);
+                    if (i % eval_freq == 0)
+                    {
+                        // Get win rate on 50 random games with p1 and 50 p2
+                        // double win_r = Game.RandomPlayerMatch(50, nodeMap, 1);
+                        // win_r += Game.RandomPlayerMatch(50, nodeMap, 0);
+                        // Report win rate
+                        // Console.WriteLine("Iteration {0}: {1}", i, win_r / 2);
+                    }
                 }
             }
             
@@ -112,28 +120,33 @@ namespace bluffstopCFR
                 node = nodeMap[infoState];
             }
             // For each action, recursively call cfr with additional history and probability
-            game.numValidActions = node.numActions;
             double[] strategy = node.getStrategy(cur_player == 0 ? p0 : p1);
             double[] util = new double[node.numActions];
 
             double nodeUtil = 0;
-            for (int a = 0; a < node.numActions; ++a)
+            for (int a = 0; a < validMoves.Count; ++a)
             {
                 BluffStop new_game = game.clone();
+                // print the actions
+                // Console.WriteLine(validMoves[a]);
+                
                 new_game.applyAction(validMoves[a]);
+                
                 util[a] = cur_player == 0
                                         ? -cfr(new_game, p0 * strategy[a], p1)
                                         : -cfr(new_game, p0, p1 * strategy[a]);
                 nodeUtil += strategy[a] * util[a];
             }
             //For each action, compute and accumulate counterfactual regret
-            for (int a = 0; a < node.numActions; a++)
+            for (int a = 0; a < validMoves.Count; a++)
             {
                 double regret = util[a] - nodeUtil;
                 node.regretSum[a] += (cur_player == 0 ? p1 : p0) * regret;
             }
             return nodeUtil;
         }
+    
     }
+    
     
 } // end namespace
