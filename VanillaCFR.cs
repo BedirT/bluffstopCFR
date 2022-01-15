@@ -8,8 +8,8 @@ namespace bluffstopCFR
         public string infoState;
         public int numActions;
         public double[] regretSum, strategy, strategySum;
-        Dictionary<string, var> validActions;
-        public Node (string infoState, int numActions, Dictionary<string, var> validActions) {
+        List<string> validActions;
+        public Node (string infoState, int numActions, List<string> validActions) {
             this.infoState = infoState;
             this.numActions = numActions;
             this.validActions = validActions;
@@ -58,7 +58,7 @@ namespace bluffstopCFR
             return avgStrategy;
         }
         // Get information set string representation
-        public string toString()
+        public override string ToString()
         {
             return string.Format("{0}:\t{1}", this.infoState, string.Join(" ", getAverageStrategy()));
         }
@@ -66,21 +66,24 @@ namespace bluffstopCFR
 
     class CFRTrainer
     {
-        public int numActions;
         public static Random random = new Random();
-        public int print_freq;
         public static Dictionary<string, Node> nodeMap = new Dictionary<string, Node>();
         // Train Khun poker
         public CFRTrainer(){}
         public void train(int iterations)
         {
             double util = 0;
-            for (int i = 0; i < iterations; i++)
-            {
-                // Todo: Change the game into generic game
-                BluffStop game = new BluffStop();
-                util += cfr(game, 1, 1);
+            Console.WriteLine("Number of states: " + nodeMap.Count);
+            using (var progress = new ProgressBar()) {
+                for (int i = 0; i < iterations; i++)
+                {
+                    progress.Report((double) i / iterations);
+                    // Todo: Change the game into generic game
+                    BluffStop game = new BluffStop();
+                    util += cfr(game, 1, 1);
+                }
             }
+            
             Console.WriteLine("Average game value: " + util / iterations);
         }
 
@@ -92,11 +95,11 @@ namespace bluffstopCFR
         // Counterfactual regret minimization iteration
         private double cfr(BluffStop game, double p0, double p1)
         {
-            int cur_player = game.currentPlayer();
+            int cur_player = game.currentPlayer;
             if (game.isTerminal())
                 return game.getUtility();
             Card lastClaimedCard = game.getLastClaimedCard();
-            Dictionary<string, var> validMoves = game.validMoves(lastClaimedCard);
+            List<string> validMoves = game.validMoves(lastClaimedCard);
             int numActions = game.numValidActions;
             string infoState = game.getInfoState();
             Node node;
@@ -117,7 +120,7 @@ namespace bluffstopCFR
             for (int a = 0; a < node.numActions; ++a)
             {
                 BluffStop new_game = game.clone();
-                new_game.applyAction(a, node.validMoves);
+                new_game.applyAction(validMoves[a]);
                 util[a] = cur_player == 0
                                         ? -cfr(new_game, p0 * strategy[a], p1)
                                         : -cfr(new_game, p0, p1 * strategy[a]);
@@ -133,96 +136,4 @@ namespace bluffstopCFR
         }
     }
     
-    class VanillaCFRRunner
-    {
-        public static Random random = new Random();
-        static void Main(string[] args)
-        {
-            int iterations = 1000000;
-            int print_freq = 100;
-            CFRTrainer trainer = new CFRTrainer(print_freq);
-            trainer.train(iterations);
-            // Get the strategy from trainer
-            Dictionary<string, Node> nodeMap = trainer.getNodeMap();
-            // Print the key-value pairs in the dictionary
-            foreach (KeyValuePair<string, Node> entry in nodeMap)
-            {
-                Console.WriteLine(entry.Value.toString());
-            }
-
-            // Play agains random opponent
-            // int num_rounds = 100;
-            // int num_games = 10000;
-            // int wins = 0, losses = 0, ties = 0;
-            // for (int i = 0; i < num_games; i++)
-            // {
-            //     int player_value = 0;
-            //     int opponent_value = 0;
-            //     for (int r = 0; r < num_rounds; ++r){
-            //         int round_value = playAgainstRandom(nodeMap, 0);
-            //         if (round_value > 0)
-            //             player_value += round_value;
-            //         else
-            //             opponent_value += round_value;
-            //     }
-            //     if (player_value > opponent_value)
-            //         wins++;
-            //     else if (player_value < opponent_value)
-            //         losses++;
-            //     else
-            //         ties++;
-            // }
-            // Console.WriteLine("Wins: " + wins + " Losses: " + losses + " Ties: " + ties);
-            // Console.WriteLine("Win rate: " + (double)wins / (double)(wins + losses + ties));
-        }
-
-        // Play against random opponent
-        private static int playAgainstRandom(Dictionary<string, Node> nodeMap, int player_order)
-        {
-            int[] cards = new int[] { 1, 2, 3 };
-            string history = "";
-            
-            // Shuffle cards
-            for (int j = 0; j < cards.Length; j++)
-            {
-                int temp = cards[j];
-                int randomIndex = random.Next(j, cards.Length);
-                cards[j] = cards[randomIndex];
-                cards[randomIndex] = temp;
-            }
-            // Players receive cards
-            int player = player_order;
-            int opponent = 1 - player;
-            int playerCard = cards[player];
-            int opponentCard = cards[opponent];
-
-            // Play until game ends
-            while(true)
-            {
-                if (history.Length > 1){
-                    bool terminalPass = Equals(history.Substring(history.Length - 1), "p");
-                    bool doubleBet = history.Substring(history.Length - 2).Equals("bb");
-                    if (terminalPass)
-                        if (history.Equals("pp"))
-                            return playerCard > opponentCard ? 1 : -1;
-                        else
-                            return 1;
-                    else if (doubleBet)
-                        return playerCard > opponentCard ? 2 : -2;
-                }
-                // if players turn, choose action
-                int a = 0;
-                if (history.Length % 2 == player_order){
-                    string infoState = cards[player] + history;
-                    double[] strategy = nodeMap[infoState].getAverageStrategy();
-                    a = random.NextDouble() < strategy[0] ? 0 : 1;
-                }
-                else {
-                    // if opponents turn, choose random action between 0 and 1
-                    a = random.NextDouble() < 0.5 ? 0 : 1;
-                }
-                history += (a == 0 ? "p" : "b");
-            } // end while
-        } // end playAgainstRandom
-    } // end class
 } // end namespace
