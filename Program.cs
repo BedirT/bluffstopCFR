@@ -6,13 +6,20 @@ namespace bluffstopCFR{
         public static void Main(String[] args)
         {
             // TestGame();
-            Dictionary<string, Node> nodeMap = TrainCFR(100);
-            RandomPlayerMatch(1000, nodeMap);
+            int print_freq = 10000;
+            Dictionary<string, Node> nodeMap = TrainCFR(1, print_freq);
+            Console.WriteLine("Done training");
+            Console.WriteLine("Number of nodes: " + nodeMap.Count);
+            // double win_r = Game.HumanPlayerMatch(5, nodeMap, 1);
+            double win_r = Game.RandomPlayerMatch(100, nodeMap, 0);
+            Console.WriteLine("End win rate: {0}", win_r);
+            // Report the number of random moves
+            
         }
 
-        public static Dictionary<string, Node> TrainCFR(int numIterations)
+        public static Dictionary<string, Node> TrainCFR(int numIterations, int print_freq)
         {
-            CFRTrainer trainer = new CFRTrainer();
+            CFRTrainer trainer = new CFRTrainer(print_freq);
             trainer.train(numIterations);
             // Get the strategy from trainer
             Dictionary<string, Node> nodeMap = trainer.getNodeMap();
@@ -20,64 +27,5 @@ namespace bluffstopCFR{
             // make sure its reusable
             return nodeMap;
         }
-
-        public static void RandomPlayerMatch(int numGames, Dictionary<string, Node> strategy)
-        {
-            // Play agains random opponent
-            int numRounds = 100;
-            int wins = 0, losses = 0, ties = 0;
-            Player player1 = new CFRPlayer(strategy);
-            Player player2 = new RandomPlayer();
-
-            for (int i = 0; i < numGames; i++)
-            {
-                int playerValue = 0;
-                int opponentValue = 0;
-                for (int r = 0; r < numRounds; ++r){
-                    int roundValue = playAGame(player1, player2);
-                    if (roundValue > 0)
-                        playerValue += roundValue;
-                    else
-                        opponentValue += roundValue;
-                }
-                if (playerValue > opponentValue)
-                    wins++;
-                else if (playerValue < opponentValue)
-                    losses++;
-                else
-                    ties++;
-            }
-            Console.WriteLine("Wins: " + wins + " Losses: " + losses + " Ties: " + ties);
-            Console.WriteLine("Win rate: " + (double)wins / (double)(wins + losses + ties));
-        }
-
-        public static int playAGame(Player player1, Player player2){
-            Random rnd = new Random();
-            BluffStop game = new BluffStop();
-            while (!game.isTerminal())
-            {
-                // get valid moves
-                Card oppClaimedCard = game.getLastClaimedCard();
-                List<string> moves = game.validMoves(oppClaimedCard);
-
-                // player gets action
-                int action;
-                if (game.currentPlayer == 0)
-                {
-                    // get action
-                    action = player1.getAction(game, moves);
-                }
-                else
-                {
-                    // get action
-                    action = player2.getAction(game, moves);
-                }
-                
-                game.applyAction(moves[action]);
-            }
-            // return the value of the game for player 1
-            return game.getUtility(0);
-        }
     }
-
 }
