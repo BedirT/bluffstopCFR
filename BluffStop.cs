@@ -114,12 +114,12 @@ namespace bluffstopCFR
         public override int GetHashCode()
         {
             // ? Check if ever called
-            return rank * 100 + suit.GetHashCode();
+            return rank * 131 + suit.GetHashCode();
         }
 
         public bool greaterThan(Card card)
         {
-            if (this.suit != card.suit)
+            if (this.suit != card.suit && card.suit != "w")
             {
                 return false;
             }
@@ -195,6 +195,10 @@ namespace bluffstopCFR
 
             playerBluffableCards.Add(new Dictionary<string, List<Card>>());
             playerBluffableCards.Add(new Dictionary<string, List<Card>>());
+
+            playerActionHistory.Add(new List<string>());
+            playerActionHistory.Add(new List<string>());
+
             foreach (string suit in suits)
             {
                 foreach (string number in numbers)
@@ -209,6 +213,12 @@ namespace bluffstopCFR
                         playerBluffableCards[i][suit].Add(new Card(suit, number));
                     }
                 }
+            }
+
+            for (int i = 0; i < 2; i++)
+            {
+                playerBluffableCards[i]["w"] = new List<Card>();
+                playerBluffableCards[i]["w"].Add(new Card("w", "0"));
             }
         }
 
@@ -334,9 +344,19 @@ namespace bluffstopCFR
                 // this should never happen
                 throw new Exception("No previous move");
             }
-            string lastAction = refreeActionHistory[refreeActionHistory.Count - 1];
-            int actionSize = lastAction.Length;
-            return new Card(lastAction.Substring(actionSize - 2, 1), lastAction.Substring(actionSize - 1, 1));
+            // check history until found a card
+            int i = refreeActionHistory.Count - 1;
+            while (i >= 0 && refreeActionHistory[i].Length < 3)
+            {
+                i--;
+            }
+            if (i < 0)
+            {
+                // this should never happen
+                throw new Exception("No previous move");
+            } 
+            string lastCard = refreeActionHistory[i];
+            return new Card(lastCard.Substring(1, 1), lastCard.Substring(2, 1));
         }
 
         public List<string> validMoves(Card oppClaimedCard, int player = -1)
@@ -469,7 +489,7 @@ namespace bluffstopCFR
             // suit is 'w'
             Card wildCard = new Card('w', '0');
             cardHistory.Add(wildCard);
-            refreeActionHistory.Add("w0");
+            refreeActionHistory.Add("Xw0");
         }
         
         public BluffStop clone()
@@ -479,39 +499,4 @@ namespace bluffstopCFR
             return newGame;
         }
     }
-
-    public class GameTest
-    {
-      
-        // main function for testing
-        public static void Main(String[] args)
-        {
-            // test the game
-            Random rnd = new Random();
-            BluffStop game = new BluffStop();
-            while (!game.isTerminal())
-            {
-                Console.WriteLine("Player " + game.currentPlayer + "s turn");
-                Console.WriteLine("Player " + game.currentPlayer + " has " + game.playerHands[game.currentPlayer].Count + " cards");
-                Console.WriteLine("Player " + (1 - game.currentPlayer) + " has " + game.playerHands[1 - game.currentPlayer].Count + " cards");
-                
-                // get valid moves
-                Card oppClaimedCard = game.getLastClaimedCard();
-                
-                // Report the card in middle
-                Console.WriteLine("The card in the middle is " + game.cardHistory[game.cardHistory.Count - 1].ToString());
-                
-                List<string> moves = game.validMoves(oppClaimedCard);
-                Console.WriteLine("Player " + game.currentPlayer + " has " + moves.Count + " valid moves");
-
-                // apply a random move
-                int action = rnd.Next(moves.Count);
-                Console.WriteLine("Player " + game.currentPlayer + " chooses " + moves[action]);
-                game.applyAction(moves[action]);
-                Console.WriteLine("Player " + game.currentPlayer + " moved.");
-            }
-            Console.WriteLine("Game over");
-        }
-    }
-
 }
