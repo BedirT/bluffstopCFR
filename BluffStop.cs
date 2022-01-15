@@ -119,11 +119,7 @@ namespace bluffstopCFR
 
         public bool greaterThan(Card card)
         {
-            if (this.suit != card.suit && card.suit != "w")
-            {
-                return false;
-            }
-            return this.rank > card.rank;
+            return this.rank > card.rank && (this.suit == card.suit || card.suit == "w");
         }
     }
     public class BluffStop
@@ -156,8 +152,8 @@ namespace bluffstopCFR
         public List<Card> deck = new List<Card>(); // The deck of cards
         public List<Dictionary<string, List<Card>>> playerBluffableCards = new List<Dictionary<string, List<Card>>>();
         public int currentPlayer; // The current player
-        public int previousPlayer; // The previous player
         public int numValidActions; // The number of valid actions
+        public List<int> moveOrder = new List<int>(); // The order in which the players took their actions
 
         public BluffStop()
         {
@@ -176,7 +172,6 @@ namespace bluffstopCFR
         public BluffStop(BluffStop bluffStop)
         {
             this.currentPlayer = bluffStop.currentPlayer;
-            this.previousPlayer = bluffStop.previousPlayer;
             this.initialDeckSize = bluffStop.initialDeckSize;
             this.refreeActionHistory = new List<string>(bluffStop.refreeActionHistory);
             this.playerActionHistory = new List<List<string>>(bluffStop.playerActionHistory);
@@ -261,12 +256,14 @@ namespace bluffstopCFR
 
         public void drawCards(int player, int numCards)
         {
-            // Draw cards from the deck
             for (int i = 0; i < numCards; i++)
             {
-                playerHands[player].Add(deck[i]);
-                // Remove the dealt cards from the deck
-                deck.RemoveAt(i);
+                if (deck.Count > 0)
+                {
+                    playerHands[player].Add(deck[0]);
+                    // Remove the dealt cards from the deck
+                    deck.RemoveAt(0);
+                }
             }
         }
 
@@ -285,7 +282,6 @@ namespace bluffstopCFR
         {
             // Switch to the next player
             currentPlayer = 1 - currentPlayer;
-            previousPlayer = 1 - previousPlayer;
         }
 
         public bool isTerminal()
@@ -299,6 +295,7 @@ namespace bluffstopCFR
         {
             // return info state of player
             // Information State includes (in order):
+            // 0. Player
             // 1. The cards on the player's hand
             // 2. The cards on the table
             // (The cards player can bluff are already deducable from 1, 2)
@@ -308,9 +305,11 @@ namespace bluffstopCFR
                 player = currentPlayer;
             }
             string infoState = "";
-            infoState += String.Join("", playerHands[player]);
-            infoState += String.Join("", cardHistory);
-            infoState += String.Join("", playerActionHistory[player]);
+            // Always keep the card ordered
+            infoState += player.ToString() + "\t";
+            infoState += String.Join("", playerHands[player].Select(x => x.ToString()).ToArray()) + "\t";
+            infoState += String.Join("", cardHistory.Select(x => x.ToString()).ToArray()) + "\t";
+            infoState += String.Join("", playerActionHistory[player].Select(x => x.ToString()).ToArray());
             return infoState;
         }
 
@@ -366,7 +365,7 @@ namespace bluffstopCFR
             {
                 player = currentPlayer;
             }
-            List<string> validMoves = new List<string>(); // [type of the action] if bluff
+            List<string> validMoves = new List<string>();
             // Honest moves
             for (int i = 0; i < playerHands[player].Count; i++)
             {
@@ -389,10 +388,12 @@ namespace bluffstopCFR
             }
             validMoves.Add("P");
             // If first move, or you were the last player you can't call bluff
-            validMoves.Add("C");
-            if (refreeActionHistory.Count == 0 || previousPlayer == player)
+            if (moveOrder.Count < 1 || moveOrder[moveOrder.Count - 1] == player)
+            {}
+            // Only if the last move was a bluff or honest move
+            else if (refreeActionHistory[refreeActionHistory.Count - 1][0] == 'B' || refreeActionHistory[refreeActionHistory.Count - 1][0] == 'H')
             {
-                validMoves.Remove("C");
+                validMoves.Add("C");
             }
             numValidActions = validMoves.Count;
             return validMoves;
@@ -410,6 +411,7 @@ namespace bluffstopCFR
                 player = currentPlayer;
             }
             string move = action;
+            moveOrder.Add(player);
 
             // update history
             refreeActionHistory.Add(move);
@@ -460,7 +462,11 @@ namespace bluffstopCFR
                 // if not, player draws 3 cards
                 // the last card is revealed
                 // turn continues from the current player
-                int lastCard = refreeActionHistory.Count - 1;
+                int lastCard = 0;
+                while (lastCard < refreeActionHistory.Count && refreeActionHistory[lastCard].Length < 3)
+                {
+                    lastCard++;
+                }
                 string lastCardEnc;
                 if (refreeActionHistory[lastCard][0] == 'B')
                 {
