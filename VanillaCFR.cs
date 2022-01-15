@@ -8,9 +8,11 @@ namespace bluffstopCFR
         public string infoState;
         public int numActions;
         public double[] regretSum, strategy, strategySum;
-        public Node (string infoState, int numActions) {
+        Dictionary<string, var> validActions;
+        public Node (string infoState, int numActions, Dictionary<string, var> validActions) {
             this.infoState = infoState;
             this.numActions = numActions;
+            this.validActions = validActions;
             this.regretSum = new double[numActions];
             this.strategy = new double[numActions];
             this.strategySum = new double[numActions];
@@ -76,7 +78,7 @@ namespace bluffstopCFR
             for (int i = 0; i < iterations; i++)
             {
                 // Todo: Change the game into generic game
-                BluffStoppers game = new BluffStoppers();
+                BluffStop game = new BluffStop();
                 util += cfr(game, 1, 1);
             }
             Console.WriteLine("Average game value: " + util / iterations);
@@ -88,36 +90,41 @@ namespace bluffstopCFR
         }
 
         // Counterfactual regret minimization iteration
-        private double cfr(BluffStoppers game, double p0, double p1)
+        private double cfr(BluffStop game, double p0, double p1)
         {
             int cur_player = game.currentPlayer();
             if (game.isTerminal())
                 return game.getUtility();
+            Card lastClaimedCard = game.getLastClaimedCard();
+            Dictionary<string, var> validMoves = game.validMoves(lastClaimedCard);
+            int numActions = game.numValidActions;
             string infoState = game.getInfoState();
             Node node;
             if (!nodeMap.ContainsKey(infoState))
             {
-                node = new Node(infoState, game.getNumActions());
+                node = new Node(infoState, numActions, validMoves);
                 nodeMap.Add(infoState, node);
             }
             else {
                 node = nodeMap[infoState];
             }
             // For each action, recursively call cfr with additional history and probability
+            game.numValidActions = node.numActions;
             double[] strategy = node.getStrategy(cur_player == 0 ? p0 : p1);
-            double[] util = new double[numActions];
+            double[] util = new double[node.numActions];
+
             double nodeUtil = 0;
-            for (int a = 0; a < numActions; ++a)
+            for (int a = 0; a < node.numActions; ++a)
             {
-                BluffStoppers new_game = game.clone();
-                new_game.applyAction(a);
+                BluffStop new_game = game.clone();
+                new_game.applyAction(a, node.validMoves);
                 util[a] = cur_player == 0
                                         ? -cfr(new_game, p0 * strategy[a], p1)
                                         : -cfr(new_game, p0, p1 * strategy[a]);
                 nodeUtil += strategy[a] * util[a];
             }
             //For each action, compute and accumulate counterfactual regret
-            for (int a = 0; a < numActions; a++)
+            for (int a = 0; a < node.numActions; a++)
             {
                 double regret = util[a] - nodeUtil;
                 node.regretSum[a] += (cur_player == 0 ? p1 : p0) * regret;
@@ -132,9 +139,8 @@ namespace bluffstopCFR
         static void Main(string[] args)
         {
             int iterations = 1000000;
-            int numActions = 2;
             int print_freq = 100;
-            CFRTrainer trainer = new CFRTrainer(numActions, print_freq);
+            CFRTrainer trainer = new CFRTrainer(print_freq);
             trainer.train(iterations);
             // Get the strategy from trainer
             Dictionary<string, Node> nodeMap = trainer.getNodeMap();
@@ -145,29 +151,29 @@ namespace bluffstopCFR
             }
 
             // Play agains random opponent
-            int num_rounds = 100;
-            int num_games = 10000;
-            int wins = 0, losses = 0, ties = 0;
-            for (int i = 0; i < num_games; i++)
-            {
-                int player_value = 0;
-                int opponent_value = 0;
-                for (int r = 0; r < num_rounds; ++r){
-                    int round_value = playAgainstRandom(nodeMap, 0);
-                    if (round_value > 0)
-                        player_value += round_value;
-                    else
-                        opponent_value += round_value;
-                }
-                if (player_value > opponent_value)
-                    wins++;
-                else if (player_value < opponent_value)
-                    losses++;
-                else
-                    ties++;
-            }
-            Console.WriteLine("Wins: " + wins + " Losses: " + losses + " Ties: " + ties);
-            Console.WriteLine("Win rate: " + (double)wins / (double)(wins + losses + ties));
+            // int num_rounds = 100;
+            // int num_games = 10000;
+            // int wins = 0, losses = 0, ties = 0;
+            // for (int i = 0; i < num_games; i++)
+            // {
+            //     int player_value = 0;
+            //     int opponent_value = 0;
+            //     for (int r = 0; r < num_rounds; ++r){
+            //         int round_value = playAgainstRandom(nodeMap, 0);
+            //         if (round_value > 0)
+            //             player_value += round_value;
+            //         else
+            //             opponent_value += round_value;
+            //     }
+            //     if (player_value > opponent_value)
+            //         wins++;
+            //     else if (player_value < opponent_value)
+            //         losses++;
+            //     else
+            //         ties++;
+            // }
+            // Console.WriteLine("Wins: " + wins + " Losses: " + losses + " Ties: " + ties);
+            // Console.WriteLine("Win rate: " + (double)wins / (double)(wins + losses + ties));
         }
 
         // Play against random opponent
