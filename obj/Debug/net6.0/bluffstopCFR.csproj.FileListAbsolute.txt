@@ -1,0 +1,15 @@
+/home/bedir/Documents/bluffstopCFR/bin/Debug/net6.0/bluffstopCFR
+/home/bedir/Documents/bluffstopCFR/bin/Debug/net6.0/bluffstopCFR.deps.json
+/home/bedir/Documents/bluffstopCFR/bin/Debug/net6.0/bluffstopCFR.runtimeconfig.json
+/home/bedir/Documents/bluffstopCFR/bin/Debug/net6.0/bluffstopCFR.dll
+/home/bedir/Documents/bluffstopCFR/bin/Debug/net6.0/ref/bluffstopCFR.dll
+/home/bedir/Documents/bluffstopCFR/bin/Debug/net6.0/bluffstopCFR.pdb
+/home/bedir/Documents/bluffstopCFR/obj/Debug/net6.0/bluffstopCFR.csproj.AssemblyReference.cache
+/home/bedir/Documents/bluffstopCFR/obj/Debug/net6.0/bluffstopCFR.GeneratedMSBuildEditorConfig.editorconfig
+/home/bedir/Documents/bluffstopCFR/obj/Debug/net6.0/bluffstopCFR.AssemblyInfoInputs.cache
+/home/bedir/Documents/bluffstopCFR/obj/Debug/net6.0/bluffstopCFR.AssemblyInfo.cs
+/home/bedir/Documents/bluffstopCFR/obj/Debug/net6.0/bluffstopCFR.csproj.CoreCompileInputs.cache
+/home/bedir/Documents/bluffstopCFR/obj/Debug/net6.0/bluffstopCFR.dll
+/home/bedir/Documents/bluffstopCFR/obj/Debug/net6.0/ref/bluffstopCFR.dll
+/home/bedir/Documents/bluffstopCFR/obj/Debug/net6.0/bluffstopCFR.pdb
+/home/bedir/Documents/bluffstopCFR/obj/Debug/net6.0/bluffstopCFR.genruntimeconfig.cache
