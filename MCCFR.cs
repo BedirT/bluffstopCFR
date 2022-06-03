@@ -27,8 +27,26 @@ namespace MCCFR
                 return oracle;
             }
         }
-        public AveragePolicy average_policy() {
-            return new AveragePolicy(this.infostates);
+        public Dictionary<int, double> average_policy(State state) {
+            List<int> legalActions = state.legal_actions;
+            string infoStateKey = state.info_state_key;
+            Dictionary<int, double> avgPolicy = new Dictionary<int, double>();
+            if (!infostates.ContainsKey(infoStateKey)) {
+                // uniform policy
+                foreach (int action in legalActions) {
+                    avgPolicy.Add(action, 1.0 / legalActions.Count);
+                }
+                return avgPolicy;
+            }
+            double policy_sum = 0.00;
+            List<List<double>> theInfoState = infostates[infoStateKey];
+            foreach (int action in legalActions) {
+                policy_sum += theInfoState[AVG_POLICY_INDEX][action];
+            }
+            foreach (int action in legalActions) {
+                avgPolicy.Add(action, theInfoState[AVG_POLICY_INDEX][action] / policy_sum);
+            }
+            return avgPolicy;
         }
         public List<double> regret_matching(List<double> regrets, int numLegalActions){
             List<double> positive_regrets = new List<double>();
@@ -50,5 +68,19 @@ namespace MCCFR
             }
             return positive_regrets;
         }
+    }
+    public class MCCFROS : MCCFRBase {
+        // Outcome Sampling Monte Carlo CFR
+        double exploration_constant = 0.6;
+        public void run(int numIterations) {
+            for (int i = 0; i < numIterations; i++) {
+                Console.WriteLine("Iteration " + i);
+                run_iteration();
+            }
+        }
+        public void run_iteration() {
+            // initialize the regrets
+            foreach (string key in infostates.Keys) {
+                List<List<double>> theInfoState = infostates[key];
     }
 }
