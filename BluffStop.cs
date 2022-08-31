@@ -6,9 +6,9 @@ namespace bluffstopCFR
 {
     public class Card
     {
-
         public int rank;
         public string suit; // spades, hearts, diamonds, clubs and wild
+        
         public Card(string suit, string rank)
         {
             this.suit = suit;
@@ -108,7 +108,7 @@ namespace bluffstopCFR
             {
                 return false;
             }
-            return this.rank == card.rank && (this.suit == card.suit || this.suit == "w");
+            return this.rank == card.rank && (this.suit == card.suit || this.suit == "w" || card.suit == "w");
         }
 
         public override int GetHashCode()
@@ -146,7 +146,7 @@ namespace bluffstopCFR
         */
         public List<string> refreeActionHistory = new List<string>(); // the full history of the game 
         public List<List<string>> playerActionHistory = new List<List<string>>(); // The actions players have taken
-        public List<List<Card>> playerHands = new List<List<Card>>(); // The cards in each player's hand
+        public List<Dictionary<string, Card>> playerHands = new List<Dictionary<string, Card>>(); // The cards in each player's hand
         public List<Card> cardHistory = new List<Card>(); // The cards only both of the players see on the table
         public int initialDeckSize; // The initial size of the deck
         public List<Card> deck = new List<Card>(); // The deck of cards
@@ -175,7 +175,7 @@ namespace bluffstopCFR
             this.initialDeckSize = bluffStop.initialDeckSize;
             this.refreeActionHistory = new List<string>(bluffStop.refreeActionHistory);
             this.playerActionHistory = new List<List<string>>(bluffStop.playerActionHistory);
-            this.playerHands = new List<List<Card>>(bluffStop.playerHands);
+            this.playerHands = new List<Dictionary<string, Card>>(bluffStop.playerHands);
             this.cardHistory = new List<Card>(bluffStop.cardHistory);
             this.deck = new List<Card>(bluffStop.deck);
             this.playerBluffableCards = new List<Dictionary<string, List<Card>>>(bluffStop.playerBluffableCards);
@@ -198,7 +198,7 @@ namespace bluffstopCFR
             {
                 foreach (string number in numbers)
                 {
-                    this.deck.Add(new Card(suit, number));
+                    deck.Add(new Card(suit, number));
                     for (int i = 0; i < 2; i++)
                     {
                         if (!playerBluffableCards[i].ContainsKey(suit))
@@ -229,20 +229,36 @@ namespace bluffstopCFR
                 deck[i] = deck[j];
                 deck[j] = temp;
             }
+            // throw error if deck contains same card twice
+            for (int i = 0; i < deckSize; i++)
+            {
+                for (int j = i + 1; j < deckSize; j++)
+                {
+                    if (deck[i].Equals(deck[j]))
+                    {
+                        throw new Exception("Deck contains same card twice");
+                    }
+                }
+            }
+
         }
 
         public void dealCards()
         {
-            playerHands.Add(new List<Card>());  // Player 0
-            playerHands.Add(new List<Card>());  // Player 1
+            // Print the deck
+            playerHands.Add(new Dictionary<string, Card>());  // Player 0
+            playerHands.Add(new Dictionary<string, Card>());  // Player 1
+            
             // Deal cards to players
             for (int i = 0; i < 7; i++)
             {
-                playerHands[0].Add(deck[i]);
-                playerHands[1].Add(deck[i + 7]);
-                // Remove the dealt cards from the deck
-                deck.RemoveAt(i);
-                deck.RemoveAt(i + 7);
+                playerHands[0].Add(deck[0].ToString(), deck[0]);
+                deck.RemoveAt(0);
+            }
+            for (int i = 0; i < 7; i++)
+            {
+                playerHands[1].Add(deck[0].ToString(), deck[0]);
+                deck.RemoveAt(0);
             }
         }
 
@@ -256,11 +272,12 @@ namespace bluffstopCFR
 
         public void drawCards(int player, int numCards)
         {
+            
             for (int i = 0; i < numCards; i++)
             {
                 if (deck.Count > 0)
                 {
-                    playerHands[player].Add(deck[0]);
+                    playerHands[player].Add(deck[0].ToString(), deck[0]);
                     // Remove the dealt cards from the deck
                     deck.RemoveAt(0);
                 }
@@ -358,6 +375,8 @@ namespace bluffstopCFR
             return new Card(lastCard.Substring(1, 1), lastCard.Substring(2, 1));
         }
 
+
+        // VALID MOVES ARE INCORRECT: Each action might be represented with an integer.
         public List<string> validMoves(Card oppClaimedCard, int player = -1)
         {
             // return the valid moves for player
@@ -367,11 +386,11 @@ namespace bluffstopCFR
             }
             List<string> validMoves = new List<string>();
             // Honest moves
-            for (int i = 0; i < playerHands[player].Count; i++)
+            foreach (KeyValuePair<string, Card> card in playerHands[player])
             {
-                if (playerHands[player][i].greaterThan(oppClaimedCard))
+                if (card.Value.greaterThan(oppClaimedCard))
                 {
-                    validMoves.Add("H" + playerHands[player][i].ToString());
+                    validMoves.Add("H" + card.Key);
                 }
             }
             // Bluff moves
@@ -380,9 +399,9 @@ namespace bluffstopCFR
                 if (playerBluffableCards[player][oppClaimedCard.suit][i].greaterThan(oppClaimedCard) &&
                     playerBluffableCards[player][oppClaimedCard.suit][i] != oppClaimedCard)
                 {
-                    for (int j = 0; j < playerHands[player].Count; j++)
+                    foreach (KeyValuePair<string, Card> card in playerHands[player])
                     {
-                        validMoves.Add("B" + playerBluffableCards[player][oppClaimedCard.suit][i].ToString() + playerHands[player][j].ToString());
+                        validMoves.Add("B" + playerBluffableCards[player][oppClaimedCard.suit][i].ToString() + card.Key);
                     }
                 }
             }
@@ -394,6 +413,18 @@ namespace bluffstopCFR
             else if (refreeActionHistory[refreeActionHistory.Count - 1][0] == 'B' || refreeActionHistory[refreeActionHistory.Count - 1][0] == 'H')
             {
                 validMoves.Add("C");
+            }
+            // Check if legal actions contain multiple of same action
+            // If yes, throw error
+            if (validMoves.Count > 1)
+            {
+                for (int i = 0; i < validMoves.Count; i++)
+                {
+                    if (validMoves.Count(x => x == validMoves[i]) > 1)
+                    {
+                        throw new Exception("Multiple of same action in legal actions");
+                    }
+                }
             }
             numValidActions = validMoves.Count;
             return validMoves;
@@ -421,8 +452,8 @@ namespace bluffstopCFR
             if (move[0] == 'H')
             {
                 // honest action
-                Card card = new Card(move[1], move[2]);
-                playerHands[player].Remove(card);
+                String card_to_remove = move.Substring(1, 2);
+                playerHands[player].Remove(card_to_remove);
             }
             else if (move[0] == 'P')
             {
@@ -438,7 +469,7 @@ namespace bluffstopCFR
             {
                 // bluff action
                 // Card bluffCard = new Card(move[1], move[2]); 
-                Card realCard = new Card(move[3], move[4]);
+                string realCard = move.Substring(3, 2); 
                 playerHands[player].Remove(realCard);
             }
             else
