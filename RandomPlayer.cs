@@ -2,9 +2,9 @@ namespace bluffstopCFR {
     class RandomPlayer : Player {
         public RandomPlayer(){}
         
-        public override int getAction(BluffStop game, List<string> moves) {
+        public override int getAction(KuhnPoker game, List<int> actions) {
             Random rnd = new Random();
-            int action = rnd.Next(moves.Count);
+            int action = rnd.Next(actions.Count);
             return action;
         }
         

@@ -6,15 +6,15 @@ namespace bluffstopCFR
     // Blueprint for a player
     public class Player
     {
-        public Dictionary<string, Node> strategy;
+        public Dictionary<int, float> strategy;
         //constructor
-        public Player(Dictionary<string, Node> strategy = null)
+        public Player(Dictionary<int, float> strategy = null)
         {
             // initialize the strategy
             this.strategy = strategy;
         }
         
-        public virtual int getAction(BluffStop game, List<string> moves)
+        public virtual int getAction(KuhnPoker game, List<int> actions)
         {
             // get the action
             return 0;

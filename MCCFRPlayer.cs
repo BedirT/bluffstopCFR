@@ -8,10 +8,10 @@ namespace bluffstopCFR
         public MCCFRPlayer(MCCFROutcomeSampling mccfr) { 
             this.mccfr = mccfr;
         }
-        public int getAction(BluffStop game, List<string> legal_actions) {
+        public int getAction(KuhnPoker game, List<int> legal_actions) {
             // get the action
             string infoState = game.getInfoState();
-            Dictionary<string,double> policy = mccfr.action_probs_avg_policy(infoState, game.currentPlayer, legal_actions);
+            Dictionary<int,double> policy = mccfr.action_probs_avg_policy(infoState, game.currentPlayer, legal_actions);
             double marker = rnd.NextDouble();
             double sum_probs = 0;
             for (int action_idx = 0; action_idx < legal_actions.Count; action_idx++) {

@@ -7,8 +7,10 @@ namespace bluffstopCFR {
         // init
         public Dictionary<string, List<List<double>>> info_states;
         public double eps;
+        // public Game game;
         public double exploration_constant = 0.6;
         public MCCFROutcomeSampling() {
+            // this.game = game;
             info_states = new Dictionary<string, List<List<double>>>();
             eps = 1e6;
         }
@@ -42,14 +44,13 @@ namespace bluffstopCFR {
         public List<double> regret_matching(List<double> regrets, int num_legal_actions){
             List<double> positive_regrets = new List<double>();
             // Get positive regrets
-            for (int i = 0; i < num_legal_actions; i++) {
-                if (regrets[i] > 0) { positive_regrets.Add(regrets[i]); }
-                else                { positive_regrets.Add(0.0); }
-            }
-            // Get regret sum
             double positive_regret_sum = 0.0;
             for (int i = 0; i < num_legal_actions; i++) {
-                positive_regret_sum += positive_regrets[i];
+                if (regrets[i] > 0) { 
+                    positive_regrets.Add(regrets[i]); 
+                    positive_regret_sum += regrets[i];
+                }
+                else { positive_regrets.Add(0.0); }
             }
             List<double> avg_regret = new List<double>();
             // return avg regret
@@ -66,9 +67,9 @@ namespace bluffstopCFR {
             return avg_regret;
         }
         // action_probs
-        public Dictionary<string, double> action_probs_avg_policy(string info_state, int player, List<string> legal_actions){
+        public Dictionary<int, double> action_probs_avg_policy(string info_state, int player, List<int> legal_actions){
             // For the given player, return the action probabilities for the given info_state
-            Dictionary<string, double> action_probs = new Dictionary<string, double>();
+            Dictionary<int, double> action_probs = new Dictionary<int, double>();
             if (info_states.ContainsKey(info_state)) {
                 List<double> avg_policy = info_states[info_state][Index.AvgPolicy];
                 double avg_policy_sum = 0.0;
@@ -90,20 +91,20 @@ namespace bluffstopCFR {
         // MCCFR - Outcome Sampling
         public void iteration() {
             // Single iteration of MCCFR - Outcome Sampling
+            KuhnPoker game = new KuhnPoker();
             for (int player = 0; player < 2; player++) {
-                BluffStop game = new BluffStop();
                 episode(game, player, 1.0, 1.0, 1.0);
+                game.reset();
             }
         }
         // episode
-        public double episode(BluffStop game, int update_player, double my_reach, double opp_reach, double sample_reach){
+        public double episode(KuhnPoker game, int update_player, double my_reach, double opp_reach, double sample_reach){
             if (game.isTerminal()) {
-                return game.getUtility();
+                return game.getUtility(update_player);
             }
             int cur_player = game.currentPlayer;
-            string info_state = game.getInfoState();
-            Card lastClaimedCard = game.getLastClaimedCard();
-            List<string> legal_actions = game.validMoves(lastClaimedCard);
+            string info_state = game.getInfoState(cur_player);
+            List<int> legal_actions = game.legalActions();
             int num_legal_actions = legal_actions.Count;
             List<List<double>> lookup_info_state = info_state_lookup(info_state, num_legal_actions);
             List<double> policy = regret_matching(lookup_info_state[Index.Regret], num_legal_actions);
@@ -112,7 +113,7 @@ namespace bluffstopCFR {
             if (cur_player == update_player) {
                 // sample policy will be a combination of uniform policy and current policy
                 for (int i = 0; i < num_legal_actions; i++) {
-                    double factor_1 = exploration_constant * 1.0 / num_legal_actions;
+                    double factor_1 = exploration_constant / num_legal_actions;
                     double factor_2 = (1.0 - exploration_constant) * policy[i];
                     sample_policy.Add(factor_1 + factor_2);
                 }
