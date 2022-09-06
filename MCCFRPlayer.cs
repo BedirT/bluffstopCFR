@@ -23,5 +23,13 @@ namespace bluffstopCFR
             // should never reach here
             return -1;
         }
+        public Dictionary<string, Dictionary<int, double>> getPolicy() {
+            var info_states = mccfr.info_states;
+            Dictionary<string, Dictionary<int, double>> policy = new Dictionary<string, Dictionary<int, double>>();
+            foreach (var info_state in info_states) {
+                policy[info_state.Key] = mccfr.action_probs_avg_policy(info_state.Key, (int)info_state.Key[1], new List<int> { 0, 1});
+            }
+            return policy;
+        }
     }
 } // end namespace bluffstopCFR

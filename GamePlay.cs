@@ -13,6 +13,16 @@ namespace bluffstopCFR {
                 int mccfr_id = i % 2;
                 win_r += playAGame(mccfr_player, random_player, mccfr_id);
             }
+            // var pol = mccfr_player.getPolicy();
+            // Console.WriteLine("MCCFR Policy:");
+            // foreach (var info_state in pol)
+            // {
+            //     Console.WriteLine("Info State: {0}", info_state.Key);
+            //     foreach (var action in info_state.Value)
+            //     {
+            //         Console.WriteLine("\tAction: {0}, Prob: {1}", action.Key, action.Value);
+            //     }
+            // }
             return win_r / numGames;
         }
 

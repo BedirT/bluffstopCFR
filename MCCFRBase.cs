@@ -1,3 +1,6 @@
+using System;
+using Numpy;
+
 namespace bluffstopCFR {
     static class Index {
         public static int Regret = 0;
@@ -5,31 +8,27 @@ namespace bluffstopCFR {
     }
     public class MCCFROutcomeSampling {
         // init
-        public Dictionary<string, List<List<double>>> info_states;
+        public Dictionary<string, List<NDarray>> info_states;
         public double eps;
         // public Game game;
         public double exploration_constant = 0.6;
         public MCCFROutcomeSampling() {
             // this.game = game;
-            info_states = new Dictionary<string, List<List<double>>>();
+            info_states = new Dictionary<string, List<NDarray>>();
             eps = 1e6;
         }
         //
-        public List<List<double>> info_state_lookup(string info_state, int num_legal_actions){
+        public List<NDarray> info_state_lookup(string info_state, int num_legal_actions){
             // return the list for the info_state from the info_states dictionary
             // if exists. Otherwise create a uniform policy.
             if (info_states.ContainsKey(info_state)) {
                 return info_states[info_state];
             } 
-            List<double> avg_policy = new List<double>();
-            List<double> regret = new List<double>();
-            // setup the policy
-            for (int i = 0; i < num_legal_actions; i++) {
-                avg_policy.Add(1.0 / eps);
-                regret.Add(1.0 / eps);
-            }
-            // add to the info_states dictionary
-            info_states.Add(info_state, new List<List<double>> { regret, avg_policy });
+            // 
+            var shape = new Numpy.Models.Shape(num_legal_actions);
+            info_states[info_state] = new List<NDarray> { 
+                np.ones(shape, np.float64) / eps, 
+                np.ones(shape, np.float64) / eps };
             return info_states[info_state];
         }
         //
@@ -41,49 +40,33 @@ namespace bluffstopCFR {
             info_states[info_state][Index.AvgPolicy][action] += amount;
         }
         //
-        public List<double> regret_matching(List<double> regrets, int num_legal_actions){
-            List<double> positive_regrets = new List<double>();
-            // Get positive regrets
-            double positive_regret_sum = 0.0;
-            for (int i = 0; i < num_legal_actions; i++) {
-                if (regrets[i] > 0) { 
-                    positive_regrets.Add(regrets[i]); 
-                    positive_regret_sum += regrets[i];
-                }
-                else { positive_regrets.Add(0.0); }
-            }
-            List<double> avg_regret = new List<double>();
+        public NDarray regret_matching(NDarray regrets, int num_legal_actions){
+            var shape = new Numpy.Models.Shape(num_legal_actions);
+            NDarray positive_regrets = np.maximum(regrets, np.zeros(shape, np.float64));
+            // Get positive regret sum
+            double positive_regret_sum = (double)np.sum(positive_regrets);
             // return avg regret
-            if (positive_regret_sum <= 0.0) {
-                for (int i = 0; i < num_legal_actions; i++) {
-                    avg_regret.Add(1.0 / num_legal_actions);
-                }
+            if (positive_regret_sum <= 0) {
+                return np.ones(shape, np.float64) / num_legal_actions;
             }
-            else {
-                for (int i = 0; i < num_legal_actions; i++) {
-                    avg_regret.Add(positive_regrets[i] / positive_regret_sum);
-                }
-            }
-            return avg_regret;
+            return positive_regrets / positive_regret_sum;
         }
         // action_probs
         public Dictionary<int, double> action_probs_avg_policy(string info_state, int player, List<int> legal_actions){
             // For the given player, return the action probabilities for the given info_state
             Dictionary<int, double> action_probs = new Dictionary<int, double>();
             if (info_states.ContainsKey(info_state)) {
-                List<double> avg_policy = info_states[info_state][Index.AvgPolicy];
-                double avg_policy_sum = 0.0;
-                for (int i = 0; i < avg_policy.Count; i++) {
-                    avg_policy_sum += avg_policy[i];
-                }
-                for (int i = 0; i < legal_actions.Count; i++) {
-                    action_probs.Add(legal_actions[i], avg_policy[i] / avg_policy_sum);
+                NDarray avg_policy = info_states[info_state][Index.AvgPolicy];
+                double avg_policy_sum = (double)np.sum(avg_policy);
+                NDarray avg_policy_normalized = avg_policy / avg_policy_sum;
+                foreach (int action in legal_actions) {
+                    action_probs[action] = (double)avg_policy_normalized[action];
                 }
             }
             else {
                 // return uniform policy
-                for (int i = 0; i < legal_actions.Count; i++) {
-                    action_probs.Add(legal_actions[i], 1.0 / legal_actions.Count);
+                foreach (int action in legal_actions) {
+                    action_probs[action] = 1.0 / legal_actions.Count;
                 }
             }
             return action_probs;
@@ -106,38 +89,43 @@ namespace bluffstopCFR {
             string info_state = game.getInfoState(cur_player);
             List<int> legal_actions = game.legalActions();
             int num_legal_actions = legal_actions.Count;
-            List<List<double>> lookup_info_state = info_state_lookup(info_state, num_legal_actions);
-            List<double> policy = regret_matching(lookup_info_state[Index.Regret], num_legal_actions);
+            List<NDarray> lookup_info_state = info_state_lookup(info_state, num_legal_actions);
+            NDarray policy = regret_matching(lookup_info_state[Index.Regret], num_legal_actions);
 
-            List<double> sample_policy = new List<double>();
+            var shape = new Numpy.Models.Shape(num_legal_actions);
+            NDarray sample_policy = null;
             if (cur_player == update_player) {
                 // sample policy will be a combination of uniform policy and current policy
                 for (int i = 0; i < num_legal_actions; i++) {
-                    double factor_1 = exploration_constant / num_legal_actions;
-                    double factor_2 = (1.0 - exploration_constant) * policy[i];
-                    sample_policy.Add(factor_1 + factor_2);
+                    var uniform_policy = (np.ones(shape, np.float64) / num_legal_actions);
+                    sample_policy = (exploration_constant * uniform_policy) + ((1 - exploration_constant) * policy);
                 }
             }
             else {
                 // sample policy will be the current policy
                 sample_policy = policy;
             }
+            if (sample_policy == null) {
+                throw new Exception("sample_policy is null");
+            }
             // sample action
-            int sample_action_idx = sample_action_from_policy(sample_policy);
+            var a = np.arange(num_legal_actions);
+            var choice = np.random.choice(a, p: sample_policy);
+            int sample_action_idx = (int)choice;
             // apply action
             game.applyAction(legal_actions[sample_action_idx]);
 
             // update reach probs
             double new_my_reach, new_opp_reach;
             if (cur_player == update_player) {
-                new_my_reach = my_reach * policy[sample_action_idx];
+                new_my_reach = my_reach * policy.GetData<double>()[sample_action_idx];
                 new_opp_reach = opp_reach;
             }
             else {
                 new_my_reach = my_reach;
-                new_opp_reach = opp_reach * policy[sample_action_idx];
+                new_opp_reach = opp_reach * policy.GetData<double>()[sample_action_idx];
             }
-            double new_sample_reach = sample_reach * sample_policy[sample_action_idx];
+            double new_sample_reach = sample_reach * sample_policy.GetData<double>()[sample_action_idx];
             // recurse
             double child_value = episode(game, update_player, new_my_reach, new_opp_reach, new_sample_reach);
 
@@ -145,7 +133,7 @@ namespace bluffstopCFR {
             List<double> child_values = new List<double>();
             for (int action_idx = 0; action_idx < num_legal_actions; action_idx++) {
                 if (action_idx == sample_action_idx) {
-                    child_values.Add(child_value / sample_policy[action_idx]);
+                    child_values.Add(child_value / sample_policy.GetData<double>()[action_idx]);
                 }
                 else {
                     child_values.Add(0.0);
@@ -153,12 +141,12 @@ namespace bluffstopCFR {
             }
             double value_estimate = 0.0;
             for (int action_idx = 0; action_idx < num_legal_actions; action_idx++) {
-                value_estimate += child_values[action_idx] * policy[action_idx];
+                value_estimate += child_values[action_idx] * policy.GetData<double>()[action_idx];;
             }
 
             // Regret and avg policy updates
             if (cur_player == update_player) {
-                List<double> regret_matching_policy = regret_matching(lookup_info_state[Index.Regret], num_legal_actions);
+                NDarray regret_matching_policy = regret_matching(lookup_info_state[Index.Regret], num_legal_actions);
                 double cf_value = value_estimate * opp_reach / sample_reach;
                 // Update regrets
                 for (int action_idx = 0; action_idx < num_legal_actions; action_idx++) {
@@ -167,25 +155,11 @@ namespace bluffstopCFR {
                 }
                 // Update avg policy 
                 for (int action_idx = 0; action_idx < num_legal_actions; action_idx++) {
-                    double pol_increment = my_reach * regret_matching_policy[action_idx] / sample_reach;
+                    double pol_increment = my_reach * regret_matching_policy.GetData<double>()[action_idx] / sample_reach;
                     add_avg_policy(info_state, action_idx, pol_increment);    
                 }
             }
             return value_estimate;
-        }
-        // sample action from policy
-        public int sample_action_from_policy(List<double> policy) {
-            // Sample an action from the given policy
-            Random rand = new Random();
-            double rand_num = rand.NextDouble();
-            double cumulative_prob = 0.0;
-            for (int i = 0; i < policy.Count; i++) {
-                cumulative_prob += policy[i];
-                if (rand_num < cumulative_prob) {
-                    return i;
-                }
-            }
-            return -1;
         }
     } // end of class MCCFROutcomeSampling
 } // end namespace MCCFRBase

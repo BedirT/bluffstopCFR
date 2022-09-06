@@ -6,6 +6,7 @@ namespace bluffstopCFR {
         public List<int> cards;
         public List<int> playerHands;
         public string actionHistory;
+        public double[] utility = { 0, 0 };
         // init
         public KuhnPoker() {
             cards = new List<int>();
@@ -41,22 +42,7 @@ namespace bluffstopCFR {
             if (player == -1) {
                 player = currentPlayer;
             }
-            if (player == 0) {
-                if (playerHands[0] > playerHands[1]) {
-                    return 1;
-                }
-                else {
-                    return -1;
-                }
-            }
-            else {
-                if (playerHands[1] > playerHands[0]) {
-                    return 1;
-                }
-                else {
-                    return -1;
-                }
-            }
+            return (int)utility[player];
         }
         public override bool isTerminal()
         {
@@ -67,6 +53,24 @@ namespace bluffstopCFR {
             }
             string last_two_actions = actionHistory.Substring(actionHistory.Length - 2);
             if (last_two_actions == "BB" || last_two_actions == "PP" || last_two_actions == "BP") {
+                // if PP +1 to player with higher card
+                // if BP +1 to player who bet
+                // if BB +2 to player with higher card
+                if (last_two_actions == "PP"){
+                    if (playerHands[0] > playerHands[1]) {
+                        utility = new double[] { 1, -1 };
+                    } else {
+                        utility = new double[] { -1, 1 };
+                    }
+                } else if (last_two_actions == "BP") {
+                    utility = new double[] { 1, -1 };
+                } else if (last_two_actions == "BB") {
+                    if (playerHands[0] > playerHands[1]) {
+                        utility = new double[] { 2, -2 };
+                    } else {
+                        utility = new double[] { -2, 2 };
+                    }
+                }
                 return true;
             }
             else {
@@ -81,7 +85,7 @@ namespace bluffstopCFR {
             if (player == -1) {
                 player = currentPlayer;
             }
-            return playerHands[player].ToString() + actionHistory;
+            return "P" + player.ToString() + playerHands[player].ToString() + actionHistory;
         }
         public override List<int> legalActions(int player = -1)
         {
@@ -108,7 +112,7 @@ namespace bluffstopCFR {
             else {
                 throw new Exception("Invalid action");
             }
-            currentPlayer = (currentPlayer + 1) % 2;
+            currentPlayer = 1 - currentPlayer;
         }
         // reset
         public void reset()
